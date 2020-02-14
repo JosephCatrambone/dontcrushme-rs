@@ -12,12 +12,15 @@ use std::iter::{Iterator, Zip};
 use std::fs::File;
 use typenum::U50;
 
+const NUM_DIMS:usize = 50;
+type WordVec = [f32; NUM_DIMS];
+
 // Utility methods
-fn cosine_similarity(va: &[f32; 50], vb: &[f32; 50]) -> f32 {
+fn cosine_similarity(va: &WordVec, vb: &WordVec) -> f32 {
 	let mut accumulator = 0.0f32;
 	let mut magnitude_a = 0.0f32;
 	let mut magnitude_b = 0.0f32;
-	for i in 0..50 {
+	for i in 0..NUM_DIMS {
 		let elem_a = va[i];
 		let elem_b = vb[i];
 		accumulator += elem_a*elem_b;
@@ -27,7 +30,7 @@ fn cosine_similarity(va: &[f32; 50], vb: &[f32; 50]) -> f32 {
 	accumulator / (magnitude_a.sqrt() * magnitude_b.sqrt())
 }
 
-//include!(concat!(env!("OUT_DIR"), "/codegen.rs"))
+//include!(concat!(env!("OUT_DIR"), "/old_codegen.rs"))
 include!{"../codegen.rs"}
 
 /// The WordVectorizer "class"
@@ -72,12 +75,59 @@ impl WordVectorizer {
 		WORD_TO_VEC.contains_key(word)
 	}
 
-	fn vectorize_word(&self, word: &str) -> &[f32; 50] {
+	fn erase_nonascii(&self, word: &str) -> Option<String> {
+		let trimmed_word:String = word
+			.chars()
+			.filter_map(|c|{
+				if c.is_ascii_alphanumeric() {
+					Some(c)
+				} else {
+					None
+				}
+			})
+			.collect();
+
+		if trimmed_word.len() > 0 {
+			Some(trimmed_word)
+		} else {
+			None
+		}
+	}
+
+	fn split_sentence(&self, sentence: &str) -> Vec<String> {
+		sentence.clone()
+			.make_ascii_lowercase()
+			.split_whitespace()
+			.filter_map(|word:&str| { self.erase_nonascii })
+			.collect()
+	}
+
+	fn vectorize_word(&self, word: &str) -> &WordVec {
 		&WORD_TO_VEC.get(word).unwrap()
 	}
 
-	fn vectorize_sentence(&self, sent: &str) -> &[f32; 50] {
-		
+	fn vectorize_sentence(&self, sent: &str) -> WordVec {
+		let mut base_vector = [0f32; NUM_DIMS];
+		let token_count = 0;
+		for w in self.split_sentence(sent) {
+			if !self.word_in_vocabulary(&w) {
+				continue
+			}
+
+			let word_vec = self.vectorize_word(&w);
+			for i in 0..NUM_DIMS {
+				base_vector[i] += word_vec[i];
+			}
+			token_count += 1;
+		}
+
+		if token_count > 0 {
+			for i in 0..NUM_DIMS {
+				base_vector[i] /= token_count as f32
+			}
+		}
+
+		base_vector
 	}
 }
 
@@ -94,7 +144,7 @@ godot_gdnative_terminate!();
 
 #[cfg(test)]
 mod tests {
-	use crate::{WordVectorizer, cosine_similarity};
+	use crate::{WordVectorizer, WordVec, cosine_similarity};
 	
 	#[test]
 	fn sanity_check_word_similarity() {
@@ -111,7 +161,14 @@ mod tests {
 	}
 
 	#[test]
-	fn serialize_wordvec_to_datfile() {
-		// Iterate through the word to vec glove file and reduce the 400k @ 50d
+	fn compare_intracluster_distance_vs_extracluster_distance() {
+		let wv = WordVectorizer::new();
+		let mut cluster_a = Vec::<WordVec>::new();
+		let mut cluster_b = Vec::<WordVec>::new();
+
+		cluster_a.push(wv.vectorize_sentence("Would it be okay if I saved everyone some time and just went mad now?"));
+		cluster_a.push(wv.vectorize_sentence("Can I play with madness?"));
+		cluster_a.push(wv.vectorize_sentence("The surest sign that you're crazy is thinking you're the only one that's sane."));
+
 	}
 }

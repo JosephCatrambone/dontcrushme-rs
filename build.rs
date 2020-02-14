@@ -4,7 +4,7 @@ use std::io::{BufWriter, Write, prelude, BufReader, BufRead};
 use std::path::Path;
 
 fn main() {
-	//let path = Path::new(&env::var("OUT_DIR").unwrap()).join("codegen.rs");
+	//let path = Path::new(&env::var("OUT_DIR").unwrap()).join("old_codegen.rs");
 	let path = Path::new("codegen.rs");
 
 	if path.exists() {
@@ -22,15 +22,14 @@ fn main() {
 		if let Ok(line) = line_result {
 			let tokens = line.split_whitespace().collect::<Vec<&str>>();
 			let word = tokens[0];
+			if !word.chars().all(|c| { c.is_ascii_alphanumeric() }) {
+				continue // Skip cases where not everything is ascii.
+				// This helps us avoid funky cases where we try and tokenize unicode madness and lets us get away with much simpler tokenization.
+			}
 			let digits = &tokens[1..];
 			write!(&mut file, "\"{}\" => [", word).unwrap();
 			write!(&mut file, "{}", digits.join(",")).unwrap();
 			write!(&mut file, "],\n").unwrap();
-			//let digits: Vec<f32> = tokens.map(|x| { x.parse::<f32>().unwrap() }).collect();
-
-			//word_to_vector.insert(word, digits);
-			//nalgebra::VectorN::from_data(digits);
-			//phf.entry(word, digits.as_slice());
 		}
 	}
 	write!(&mut file, "}};").unwrap();
