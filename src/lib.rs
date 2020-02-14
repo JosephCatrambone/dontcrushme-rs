@@ -1,25 +1,23 @@
 #[macro_use]
 extern crate approx; // For the macro relative_eq!
-//extern crate phf;
 
 use gdnative::*;
-use hashbrown::{HashMap, HashSet};
 use nalgebra;
 use nalgebra::Vector;
-//use phf::phf_map;
+use phf::phf_map;
 use std::io::prelude::*;
 use std::io::{BufReader, BufWriter};
 use std::io::SeekFrom;
-use std::iter::Zip;
+use std::iter::{Iterator, Zip};
 use std::fs::File;
 use typenum::U50;
 
 // Utility methods
-fn cosine_similarity(va: &Vec<f32>, vb: &Vec<f32>) -> f32 {
+fn cosine_similarity(va: &[f32; 50], vb: &[f32; 50]) -> f32 {
 	let mut accumulator = 0.0f32;
 	let mut magnitude_a = 0.0f32;
 	let mut magnitude_b = 0.0f32;
-	for i in 0..va.len() {
+	for i in 0..50 {
 		let elem_a = va[i];
 		let elem_b = vb[i];
 		accumulator += elem_a*elem_b;
@@ -29,13 +27,14 @@ fn cosine_similarity(va: &Vec<f32>, vb: &Vec<f32>) -> f32 {
 	accumulator / (magnitude_a.sqrt() * magnitude_b.sqrt())
 }
 
+//include!(concat!(env!("OUT_DIR"), "/codegen.rs"))
+include!{"../codegen.rs"}
+
 /// The WordVectorizer "class"
 #[derive(NativeClass)]
 #[inherit(Node)]
 #[user_data(user_data::ArcData<WordVectorizer>)]
-pub struct WordVectorizer {
-	word_to_vector: HashMap<String, Vec<f32>>
-}
+pub struct WordVectorizer;
 
 // __One__ `impl` block can have the `#[methods]` attribute, which will generate
 // code to automatically bind any exported methods to Godot.
@@ -44,8 +43,11 @@ impl WordVectorizer {
 	/// The "constructor" of the class.
 	fn _init(_owner: Node) -> Self {
 		WordVectorizer {
-			word_to_vector: HashMap::new()
 		}
+	}
+
+	fn new() -> Self {
+		WordVectorizer {}
 	}
 
 	// In order to make a method known to Godot, the #[export] attribute has to be used.
@@ -61,35 +63,21 @@ impl WordVectorizer {
 
 	#[export]
 	fn similarity(&self, _owner:Node, s1:GodotString, s2:GodotString) -> Variant {
-		let v1 = self.vectorize(&s1.to_string());
-		let v2 = self.vectorize(&s2.to_string());
+		let v1 = self.vectorize_word(&s1.to_string());
+		let v2 = self.vectorize_word(&s2.to_string());
 		return Variant::from_f64(cosine_similarity(&v1, &v2) as f64);
 	}
 
-	fn from_text_file(glove_vectors: &str) -> Self {
-		let mut fin = File::open(glove_vectors).expect(format!("Can't load vectors from '{}'", glove_vectors).as_str());
-		let mut buffered_fin = BufReader::new(fin);
-		let mut word_to_vector = HashMap::with_capacity(400_000);
-
-		for line_result in buffered_fin.lines() {
-			if let Ok(line) = line_result {
-				let mut tokens = line.split_whitespace();
-				let word = tokens.next().unwrap().to_string();
-				let digits: Vec<f32> = tokens.map(|x| { x.parse::<f32>().unwrap() }).collect();
-				word_to_vector.insert(word, digits);
-				//nalgebra::VectorN::from_data(digits);
-			}
-		}
-
-		WordVectorizer { word_to_vector }
-	}
-
 	fn word_in_vocabulary(&self, word: &str) -> bool {
-		self.word_to_vector.contains_key(word)
+		WORD_TO_VEC.contains_key(word)
 	}
 
-	fn vectorize(&self, word: &str) -> Vec<f32> {
-		self.word_to_vector.get(word).unwrap().clone()
+	fn vectorize_word(&self, word: &str) -> &[f32; 50] {
+		&WORD_TO_VEC.get(word).unwrap()
+	}
+
+	fn vectorize_sentence(&self, sent: &str) -> &[f32; 50] {
+		
 	}
 }
 
@@ -110,7 +98,7 @@ mod tests {
 	
 	#[test]
 	fn sanity_check_word_similarity() {
-		let wv = WordVectorizer::from_text_file("glove.6B.50d.txt");
+		let wv = WordVectorizer::new();
 		let wv1 = wv.vectorize("cat");
 		let wv2 = wv.vectorize("feline");
 		let wv3 = wv.vectorize("eggplant");

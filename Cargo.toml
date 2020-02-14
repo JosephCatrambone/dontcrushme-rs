@@ -8,14 +8,10 @@ edition = "2018"
 
 [dependencies]
 approx = "0.3.2"
-hashbrown = "0.7.0"
+phf = { version="0.8", features = ["macros"] }
 nalgebra = "0.18"
-phf = "0.8"
 typenum = "1.11.2"
 gdnative = "0.7"
-
-[build-dependencies]
-phf_codegen = "0.8.0"
 
 [lib]
 crate-type = ["cdylib"]
