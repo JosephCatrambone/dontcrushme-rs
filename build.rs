@@ -28,8 +28,8 @@ fn main() {
 			}
 			let digits = &tokens[1..];
 			write!(&mut file, "\"{}\" => [", word).unwrap();
-			write!(&mut file, "{}", digits.join(",")).unwrap();
-			write!(&mut file, "],\n").unwrap();
+			write!(&mut file, "{}", digits.join("f32,")).unwrap();
+			write!(&mut file, "f32],\n").unwrap();
 		}
 	}
 	write!(&mut file, "}};").unwrap();

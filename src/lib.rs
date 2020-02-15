@@ -30,6 +30,7 @@ fn cosine_similarity(va: &WordVec, vb: &WordVec) -> f32 {
 	accumulator / (magnitude_a.sqrt() * magnitude_b.sqrt())
 }
 
+//static WORD_TO_VEC: phf::Map<&'static str, [f32; 50]> = phf_map! { "foo" => [ 0f32, 1f32, 2f32, 3f32, 4f32, 5f32, 6f32, 7f32, 8f32, 9f32, 10f32, 11f32, 12f32, 13f32, 14f32, 15f32, 16f32, 17f32, 18f32, 19f32, 20f32, 21f32, 22f32, 23f32, 24f32, 25f32, 26f32, 27f32, 28f32, 29f32, 30f32, 31f32, 32f32, 33f32, 34f32, 35f32, 36f32, 37f32, 38f32, 39f32, 40f32, 41f32, 42f32, 43f32, 44f32, 45f32, 46f32, 47f32, 48f32, 49f32] };
 //include!(concat!(env!("OUT_DIR"), "/old_codegen.rs"))
 include!{"../codegen.rs"}
 
@@ -66,8 +67,8 @@ impl WordVectorizer {
 
 	#[export]
 	fn similarity(&self, _owner:Node, s1:GodotString, s2:GodotString) -> Variant {
-		let v1 = self.vectorize_word(&s1.to_string());
-		let v2 = self.vectorize_word(&s2.to_string());
+		let v1 = self.vectorize_sentence(&s1.to_string());
+		let v2 = self.vectorize_sentence(&s2.to_string());
 		return Variant::from_f64(cosine_similarity(&v1, &v2) as f64);
 	}
 
@@ -95,10 +96,10 @@ impl WordVectorizer {
 	}
 
 	fn split_sentence(&self, sentence: &str) -> Vec<String> {
-		sentence.clone()
-			.make_ascii_lowercase()
+		sentence
+			.to_ascii_lowercase()
 			.split_whitespace()
-			.filter_map(|word:&str| { self.erase_nonascii })
+			.filter_map(|word:&str| { self.erase_nonascii(word) })
 			.collect()
 	}
 
@@ -108,7 +109,7 @@ impl WordVectorizer {
 
 	fn vectorize_sentence(&self, sent: &str) -> WordVec {
 		let mut base_vector = [0f32; NUM_DIMS];
-		let token_count = 0;
+		let mut token_count = 0;
 		for w in self.split_sentence(sent) {
 			if !self.word_in_vocabulary(&w) {
 				continue
@@ -149,9 +150,9 @@ mod tests {
 	#[test]
 	fn sanity_check_word_similarity() {
 		let wv = WordVectorizer::new();
-		let wv1 = wv.vectorize("cat");
-		let wv2 = wv.vectorize("feline");
-		let wv3 = wv.vectorize("eggplant");
+		let wv1 = wv.vectorize_word("cat");
+		let wv2 = wv.vectorize_word("feline");
+		let wv3 = wv.vectorize_word("eggplant");
 		let cat_feline_sim = cosine_similarity(&wv1, &wv2);
 		let cat_eggplant_sim = cosine_similarity(&wv1, &wv3);
 		println!("Cat/Feline sim: {}", cat_feline_sim);
@@ -169,6 +170,5 @@ mod tests {
 		cluster_a.push(wv.vectorize_sentence("Would it be okay if I saved everyone some time and just went mad now?"));
 		cluster_a.push(wv.vectorize_sentence("Can I play with madness?"));
 		cluster_a.push(wv.vectorize_sentence("The surest sign that you're crazy is thinking you're the only one that's sane."));
-
 	}
 }
