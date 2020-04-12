@@ -47,6 +47,7 @@ fn make_word_to_freq() {
 	let mut file = BufWriter::new(File::create(&path).unwrap());
 	let mut word_count = HashMap::<String, u64>::new();
 	let mut word_document_count = HashMap::<String, u64>::new(); // How many unique documents have this word?
+	let mut total_docs = 0u32;
 	
 	// FIN will contain one 'document' per line.
 	let fin = File::open("corpus.txt").expect(format!("Can't load corpus to build hashmap.").as_str());
@@ -55,22 +56,25 @@ fn make_word_to_freq() {
 	for line_result in buffered_fin.lines() {
 		let mut words_seen = HashSet::<String>::new();
 		if let Ok(line) = line_result {
+			total_docs += 1;
 			// Unlike above where we split on whitespace, here we replace non-ascii with spaces before split.
-			let tokens = line.chars().map(|c| { if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { ' ' } }).to_string().split_whitespace().collect::<Vec<&str>>();
-			for word in tokens {
+			let tokens = line.chars().map(|c| { if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { ' ' } }).collect::<String>().split_whitespace().map(|s| String::from(s)).collect::<Vec<String>>();
+			for word in &tokens {
 				word_count.insert(word.to_string(), word_count.get(word).unwrap_or(&0u64) + 1);
 				if !words_seen.contains(word) {
-					word_document_count.insert(word.to_string(), word_document_count.get(word).unwrap_or(&0u64) + 1);
-					words_seen.insert(word.to_string());
+					word_document_count.insert(word.clone(), word_document_count.get(word).unwrap_or(&0u64) + 1);
+					words_seen.insert(word.clone());
 				}
 			}
 		}
 	}
 	
 	write!(&mut file, "static WORD_TO_FREQ: phf::Map<&'static str, f32> = phf_map! {{").unwrap();
-	//write!(&mut file, "\"{}\" => [", word).unwrap();
-	//write!(&mut file, "{}", digits.join("f32,")).unwrap();
-	//write!(&mut file, "f32],\n").unwrap();
+	for (word, doc_count) in word_document_count.iter() {
+		if *doc_count > 1 {
+			write!(&mut file, "\"{}\" => {}f32,\n", word, *doc_count as f32 / total_docs as f32).unwrap();
+		}
+	}
 	write!(&mut file, "}};").unwrap();
 	file.flush().unwrap();
 }

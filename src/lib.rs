@@ -1,3 +1,4 @@
+#[macro_use] extern crate approx; // For the macro relative_eq!
 
 mod sif_vectorizer;
 
@@ -11,7 +12,22 @@ use std::fs::File;
 use typenum::U50;
 use sif_vectorizer::{SIFVectorizer, NUM_DIMS, WordVec};
 
+//static WORD_TO_VEC: phf::Map<&'static str, [f32; 50]> = phf_map! { "foo" => [ 0f32, 1f32, 2f32, 3f32, 4f32, 5f32, 6f32, 7f32, 8f32, 9f32, 10f32, 11f32, 12f32, 13f32, 14f32, 15f32, 16f32, 17f32, 18f32, 19f32, 20f32, 21f32, 22f32, 23f32, 24f32, 25f32, 26f32, 27f32, 28f32, 29f32, 30f32, 31f32, 32f32, 33f32, 34f32, 35f32, 36f32, 37f32, 38f32, 39f32, 40f32, 41f32, 42f32, 43f32, 44f32, 45f32, 46f32, 47f32, 48f32, 49f32] };
+//include!(concat!(env!("OUT_DIR"), "/old_codegen.rs"))
+include!{"../word_to_vec.rs"}
+//static WORD_TO_FREQ: phf::Map<&'static str, f32>
+include!{"../word_to_freq.rs"}
+
 // Utility methods
+fn make_sif_vectorizer() -> SIFVectorizer {
+	SIFVectorizer::new_from_compiled(
+		&WORD_TO_VEC,
+		&WORD_TO_FREQ,
+		[0f32; NUM_DIMS],
+		1e-3
+	)
+}
+
 fn cosine_similarity(va: &WordVec, vb: &WordVec) -> f32 {
 	let mut accumulator = 0.0f32;
 	let mut magnitude_a = 0.0f32;
@@ -25,11 +41,6 @@ fn cosine_similarity(va: &WordVec, vb: &WordVec) -> f32 {
 	}
 	accumulator / (magnitude_a.sqrt() * magnitude_b.sqrt())
 }
-
-//static WORD_TO_VEC: phf::Map<&'static str, [f32; 50]> = phf_map! { "foo" => [ 0f32, 1f32, 2f32, 3f32, 4f32, 5f32, 6f32, 7f32, 8f32, 9f32, 10f32, 11f32, 12f32, 13f32, 14f32, 15f32, 16f32, 17f32, 18f32, 19f32, 20f32, 21f32, 22f32, 23f32, 24f32, 25f32, 26f32, 27f32, 28f32, 29f32, 30f32, 31f32, 32f32, 33f32, 34f32, 35f32, 36f32, 37f32, 38f32, 39f32, 40f32, 41f32, 42f32, 43f32, 44f32, 45f32, 46f32, 47f32, 48f32, 49f32] };
-//include!(concat!(env!("OUT_DIR"), "/old_codegen.rs"))
-include!{"../word_to_vec.rs"}
-include!{"../word_to_freq.rs"}
 
 /// The WordVectorizer "class"
 #[derive(NativeClass)]
@@ -50,11 +61,7 @@ impl WordVectorizer {
 	
 	fn new() -> Self {
 		WordVectorizer {
-			sif: SIFVectorizer::new_from_compiled(
-				WORD_TO_VEC,
-				phf_map! { "foo" => 1f32 },
-				[0f32; NUM_DIMS]
-			)
+			sif: make_sif_vectorizer()
 		}
 	}
 	
@@ -90,12 +97,12 @@ godot_gdnative_terminate!();
 
 #[cfg(test)]
 mod tests {
-	use crate::{SIFVectorizer, WordVec, cosine_similarity};
+	use crate::{SIFVectorizer, WordVec, cosine_similarity, make_sif_vectorizer};
 	use phf::Map;
 	
 	#[test]
 	fn sanity_check_word_similarity() {
-		let wv = SIFVectorizer::new_from_compiled(WORD_TO_VEC, phf_map!{}, []);
+		let wv = make_sif_vectorizer();
 		let wv1 = wv.vectorize_sentence("cat");
 		let wv2 = wv.vectorize_sentence("feline");
 		let wv3 = wv.vectorize_sentence("eggplant");
@@ -109,7 +116,7 @@ mod tests {
 
 	#[test]
 	fn compare_intracluster_distance_vs_extracluster_distance() {
-		let wv = WordVectorizer::new();
+		let wv = make_sif_vectorizer();
 		let mut cluster_a = Vec::<WordVec>::new();
 		let mut cluster_b = Vec::<WordVec>::new();
 
